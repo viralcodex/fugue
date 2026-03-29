@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Text Sync</title>
+	<style>
+		:root {
+			color-scheme: dark;
+		}
+
+		* {
+			box-sizing: border-box;
+		}
+
+		body {
+			margin: 0;
+			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+			background: #000000;
+			color: #e5e7eb;
+			min-height: 100vh;
+			display: grid;
+			place-items: center;
+			padding: 24px;
+		}
+
+		.container {
+			width: min(960px, 100%);
+			background: #121212;
+			border: 1px solid #3a3a3a;
+			border-radius: 12px;
+			padding: 20px;
+			box-shadow: 0 24px 50px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+		}
+
+		.areas {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 14px;
+			margin-bottom: 16px;
+		}
+
+		.editor-wrap {
+			position: relative;
+		}
+
+		textarea {
+			width: 100%;
+			min-height: 220px;
+			resize: vertical;
+			border: 1px solid #4a4a4a;
+			border-radius: 10px;
+			padding: 12px;
+			font: 14px/1.45 "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+			background: #2d2b2b;
+			color: #f3f4f6;
+			box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+		}
+
+		.highlight-layer {
+			position: absolute;
+			top: 0; left: 0; right: 0; bottom: 0;
+			padding: 12px;
+			border: 1px solid transparent;
+			border-radius: 10px;
+			font: 14px/1.45 "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+			white-space: pre-wrap;
+			overflow-wrap: break-word;
+			word-break: break-word;
+			overflow: hidden;
+			pointer-events: none;
+			color: transparent;
+		}
+
+		.highlight-layer .hl {
+			background: rgba(74, 222, 128, 0.35);
+			border-radius: 2px;
+		}
+
+		textarea::placeholder {
+			color: #9ca3af;
+		}
+
+		textarea:focus {
+			outline: 2px solid #69a0ff;
+			border-color: #4f8cff;
+			background: #222222;
+			box-shadow: 0 0 0 3px rgba(79, 140, 255, 0.25), 0 14px 30px rgba(0, 0, 0, 0.55);
+		}
+
+		.buttons {
+			display: flex;
+			gap: 10px;
+			flex-wrap: wrap;
+			justify-content: center;
+		}
+
+		button {
+			border: 1px solid #4a4a4a;
+			background: #2b2222;
+			color: #f3f4f6;
+			border-radius: 10px;
+			padding: 10px 14px;
+			font-size: 14px;
+			cursor: pointer;
+			transition: background 120ms ease, transform 120ms ease;
+			box-shadow: 0 8px 18px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+		}
+
+		button:hover {
+			background: #2e2e2e;
+			box-shadow: 0 10px 22px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+		}
+
+		button:active {
+			transform: translateY(1px);
+		}
+
+		#node {
+			margin: 12px;
+			padding: 10px 0;
+			width: 100%;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			color: #f3f4f6;
+			font: 13px/1.4 "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+			height: 300px;
+			overflow: auto;
+		}
+
+		@media (max-width: 760px) {
+			.areas {
+				grid-template-columns: 1fr;
+			}
+		}
+	</style>
+</head>
+<body>
+	<main class="container">
+		<section class="areas">
+			<div class="editor-wrap">
+				<textarea id="leftText" placeholder="USER 1"></textarea>
+				<div class="highlight-layer" id="hlLeft"></div>
+			</div>
+			<div class="editor-wrap">
+				<textarea id="rightText" placeholder="USER 2"></textarea>
+				<div class="highlight-layer" id="hlRight"></div>
+			</div>
+		</section>
+
+		<section class="buttons">
+			<button id="copyLeftToRight" type="button">Left to Right</button>
+			<button id="copyRightToLeft" type="button">Right to Left</button>
+			<button id="resetAll" type="button">Reset Everything</button>
+		</section>
+		<section>
+			<pre id="node">
+			</pre>
+		</section>
+	</main>
+
+	<script type="module" src="/editor.ts"></script>
+</body>
+</html>

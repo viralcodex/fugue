@@ -1,0 +1,45 @@
+1 types:
+2 RID, type of replica identifiers
+3 ID ∶= (RID × N) ∪ {null}, type of element IDs
+4 V, type of values
+5 ⊥, a marker for deleted nodes
+6 {L, R}, type of a child node’s side (left or right)
+7 NODE ∶= ID × (V ∪ {⊥}) × ID × {L, R}, tree node tuples (id, value, parent, side)
+8 per-replica CRDT state:
+9 replicaID ∈ RID: the unique ID of this replica
+10 tree ⊆ NODE × ID[] × ID[]: a set of tree node triples (node, leftChildren, rightChildren), initially {(root, [], [])}
+where root = (null, ⊥, null, null)
+11 counter ∈ N: a counter for generating element IDs, initially 0
+12 function values() ∶ V[]
+13 return traverse(null)
+14 function traverse(nodeID ∶ ID) ∶ V[]
+15 values ← []
+16 (node, leftChildren, rightChildren) ← the unique triple ∈ tree such that node.id = nodeID
+17 for childId ∈ leftChildren do values ← values + traverse(childId)
+18 if node.value ≠ ⊥ then values ← values + [node.value]
+19 for childId ∈ rightChildren do values ← values + traverse(childId)
+20 return values
+21 function insert(i ∶ N, x ∶ V)
+22 id ← (replicaID, counter ); counter ← counter + 1
+23 leftOrigin ← node for (i − 1)-th value in values(), or root if i = 0
+24 rightOrigin ← next node after leftOrigin in the tree traversal that includes tombstones
+25 if ∄id′, v′. (id′, v′, leftOrigin.id, R) ∈ tree then
+26 node ← (id, x, leftOrigin.id, R) // right child of leftOrigin; see Figure 4(a)
+27 else
+28 node ← (id, x, rightOrigin.id, L) // left child of rightOrigin; see Figure 4(b)
+29 broadcast (insert, node) by causal broadcast
+30 on delivering (insert, node) by causal broadcast
+31 (parent, leftSibs, rightSibs) ← the unique triple ∈ tree such that parent.id = node.parent
+32 if node.side = R then
+33 i ← least index such that node.id < rightSibs[i]
+34 insert node.id into rightSibs at index i
+35 else
+36 i ← least index such that node.id < leftSibs[i]
+37 insert node.id into leftSibs at index i
+38 tree ← tree ∪ {(node, [], [])}
+39 function delete(i ∶ N)
+40 node ← node for i-th value in values()
+41 broadcast (delete, node.id) by causal broadcast
+42 on delivering (delete, id) by causal broadcast
+43 (node, _, _) ← the unique triple ∈ tree such that node.id = id
+44 node.value ← ⊥
