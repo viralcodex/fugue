@@ -1,4 +1,4 @@
-import { deletes, readText, resetAllDocuments, insert, mergeDocs, getNodeAtIndex } from "./crdt";
+import { deletes, readText, resetAllDocuments, inserts, mergeDocs, getNodeAtIndex } from "./crdt";
 import type { Replica } from "./types";
 
 const leftTextArea = document.getElementById("leftText") as HTMLTextAreaElement | null;
@@ -78,7 +78,7 @@ const handleEdit = (replicaId: string, replica: Replica) => {
     deletes(start, end, replicaId);
   }
   if (insertedText.length > 0) {
-    insert(start, insertedText, replicaId);
+    inserts(start, insertedText, replicaId);
   }
 };
 

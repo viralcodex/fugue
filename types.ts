@@ -19,7 +19,8 @@ export type Doc = {
 export type ReplicaState = {
     replicaId: RId,
     counter: number,
-    docTree: Map<string, Doc>; //per replica doc tree state
+    docTree: Map<string, Doc>, //per replica doc tree state
+    visibleContentCache: Node[] | null,
 }
 
 export type Insert = {

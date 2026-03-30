@@ -3,7 +3,6 @@ import {
   type Doc,
   type ReplicaState,
   type Node,
-  type Operation,
   type Insert,
   type Delete,
 } from "./types";
@@ -27,6 +26,7 @@ const createReplicaState = (id: string): ReplicaState => {
     replicaId: id,
     counter: 0,
     docTree: new Map().set("root", createDoc()),
+    visibleContentCache: null,
   };
 };
 
@@ -44,8 +44,8 @@ const getState = (replicaId: string): ReplicaState => {
 };
 
 const values = (state: ReplicaState): string[] => {
-  const nodes = traverse("root", state.docTree);
-  return nodes.map((node) => node.content ?? "");
+  if (!state.visibleContentCache) cacheReset(state);
+  return state.visibleContentCache!.map((node) => node.content ?? "");
 };
 
 // DFS
@@ -54,8 +54,10 @@ const traverse = (
   docTree: ReplicaState["docTree"],
   includeDeleted: boolean = false,
 ): Node[] => {
+
   const values: Node[] = [];
   const entry: Doc | undefined = docTree.get(nodeID ?? "root");
+
   if (!entry) return values;
 
   for (const childKey of entry.leftChildren) {
@@ -76,20 +78,19 @@ const traverse = (
   return values;
 };
 
-const findNextNode = (targetId: Id | null, docTree: Map<string, Doc>): Node | null => {
-  const values = traverse("root", docTree, true); //include deleted as well
+// returns the left most descendant of the right subtree of the left origin node
+const findLeftMostDescendant = (targetKey: string, docTree: Map<string, Doc>): Node | null => {
+  let currentKey = targetKey;
 
-  if (targetId === null) return values[0] ?? null;
-
-  const targetKey = idToKey(targetId); //Id to string
-
-  for (let i = 0; i < values.length - 1; i++) {
-    if (idToKey(values[i]!.id) === targetKey) {
-      return values[i + 1] ?? null;
+  while (true) {
+    const entry = docTree.get(currentKey);
+    if (!entry) return null;
+    if (entry.leftChildren && entry.leftChildren.length > 0) {
+      currentKey = entry.leftChildren[0]!;
     }
+    else
+      return entry.node;
   }
-
-  return null;
 };
 
 const buildInsertOperation = (
@@ -102,30 +103,29 @@ const buildInsertOperation = (
 
   state.counter++;
 
-  const values = traverse("root", state.docTree, false);
+  if (!state.visibleContentCache) cacheReset(state);
 
-  if (index < 0 || index > values.length) {
+  if (index < 0 || index > state.visibleContentCache!.length) {
     throw new Error("Invalid index value: " + index);
   }
 
-  const leftOriginNode = index === 0 ? null : values[index - 1];
+  const leftOriginNode = index === 0 ? null : state.visibleContentCache![index - 1];
   const leftOriginId = leftOriginNode ? leftOriginNode.id : null;
 
-  const rightOriginNode = findNextNode(leftOriginId, state.docTree);
 
   const rightSubTreeForLeftOrigin = state.docTree.get(
     idToKey(leftOriginId),
   )?.rightChildren;
 
-  const rightSubTreeExists =
-    rightSubTreeForLeftOrigin && rightSubTreeForLeftOrigin.length > 0;
-
-  //if leftOrigin doesn't have any right subtree, attach the node to its right otherwise, attach it to the left of the right subtree
+  const rightSubTreeExists = rightSubTreeForLeftOrigin && rightSubTreeForLeftOrigin.length > 0;
 
   let parentId: Id | null;
   let side: "L" | "R";
 
+  //if leftOrigin doesn't have any right subtree, attach the node to its right otherwise, attach it to the left of the right subtree
   if (rightSubTreeExists) {
+    const rightOriginNode = findLeftMostDescendant(rightSubTreeForLeftOrigin[0]!, state.docTree);
+
     if (!rightOriginNode) throw new Error("No right origin for this subtree");
 
     parentId = rightOriginNode.id;
@@ -150,7 +150,6 @@ const buildInsertOperation = (
 };
 
 const insertOperation = (op: Insert, state: ReplicaState) => {
-
   const parentKey = idToKey(op.node.parent);
   const parentNode = state.docTree.get(parentKey);
 
@@ -180,16 +179,16 @@ const insertOperation = (op: Insert, state: ReplicaState) => {
     leftChildren: [],
     rightChildren: [],
   });
+
+  cacheReset(state); //rebuild the cache
 };
 
 const buildDeleteOperation = (index: number, state: ReplicaState): Delete => {
-  const values = traverse("root", state.docTree, false); //only visible elements
-
-  if (index < 0 || index >= values.length) {
+  if (index < 0 || index >= state.visibleContentCache!.length) {
     throw new Error(`Delete index out of bounds: ${index}`);
   }
 
-  const deletedNode = values[index]!;
+  const deletedNode = state.visibleContentCache![index]!;
 
   if (deletedNode.id === null) {
     throw new Error("Cannot delete root");
@@ -202,13 +201,12 @@ const buildDeleteOperation = (index: number, state: ReplicaState): Delete => {
 };
 
 const deleteOperation = (op: Delete, state: ReplicaState) => {
-
   const targetKey = idToKey(op.nodeId);
 
   const nodeToBeDeleted = state.docTree.get(targetKey);
 
   if (!nodeToBeDeleted) {
-    throw new Error("No Node found for this key " + targetKey);
+    throw new Error("No Node found for this key: " + targetKey);
   }
 
   if (nodeToBeDeleted.node.isDeleted) {
@@ -216,6 +214,8 @@ const deleteOperation = (op: Delete, state: ReplicaState) => {
   }
 
   nodeToBeDeleted.node.isDeleted = true;
+
+  cacheReset(state); //rebuild the cache
 };
 
 export const resetAllDocuments = () => {
@@ -223,7 +223,7 @@ export const resetAllDocuments = () => {
   replicaStates["B"] = createReplicaState("B");
 };
 
-export const insert = (cursor: number, text: string, replicaId: string) => {
+export const inserts = (cursor: number, text: string, replicaId: string) => {
   const state = getState(replicaId);
   for (let index = 0; index < text.length; index++) {
     const op = buildInsertOperation(cursor + index, text[index]!, state);
@@ -231,10 +231,10 @@ export const insert = (cursor: number, text: string, replicaId: string) => {
   }
 };
 
-export const deletes = (cursor: number, end: number, replicaId: string) => {
+export const deletes = (start: number, end: number, replicaId: string) => {
   const state = getState(replicaId);
-  for (let index = 0; index < end - cursor; index++) {
-    const op = buildDeleteOperation(cursor, state);
+  for (let index = 0; index < end - start; index++) {
+    const op = buildDeleteOperation(start, state);
     deleteOperation(op, state);
   }
 }
@@ -246,8 +246,7 @@ export const readText = (replicaId: string): string => {
 
 export const getNodeAtIndex = (index: number, replicaId: string): Node | null => {
   const state = getState(replicaId);
-  const nodes = traverse("root", state.docTree, false);
-  return nodes[index] ?? null;
+  return state.visibleContentCache![index] ?? null;
 };
 
 export const mergeDocs = (ltr: boolean = true) => {
@@ -285,10 +284,11 @@ const mergeContent = (srcState: ReplicaState, targetState: ReplicaState) => {
     const insertOp: Insert = { type: "insert", node: node }
     insertOperation(insertOp, targetState);
   })
+
+  cacheReset(targetState); //rebuild the target cache
 }
 
 // utils below
-
 const compareIds = (id1: Id, id2: Id) => {
   if (id1[1] !== id2[1]) return id1[1] - id2[1];
   return id1[0].localeCompare(id2[0]);
@@ -306,3 +306,7 @@ const keyToId = (key: string): Id => {
   const id = key.split(":");
   return [id[0]!, Number(id[1])];
 };
+
+const cacheReset = (state: ReplicaState) => {
+    state.visibleContentCache = traverse("root", state.docTree);
+}
