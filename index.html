@@ -118,7 +118,7 @@
 
 		#node {
 			margin: 12px;
-			padding: 10px 0;
+			padding: 12px 0;
 			width: 100%;
 			display: flex;
 			justify-content: center;
@@ -127,6 +127,14 @@
 			font: 13px/1.4 "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
 			height: 300px;
 			overflow: auto;
+		}
+
+		#heading{
+			padding-top: 24px;
+			width: 100%;
+			display: flex;
+			align-items: center;
+			justify-content: center;
 		}
 
 		@media (max-width: 760px) {
@@ -155,6 +163,7 @@
 			<button id="resetAll" type="button">Reset Everything</button>
 		</section>
 		<section>
+			<span id="heading">Tree-Node</span>
 			<pre id="node">
 			</pre>
 		</section>
