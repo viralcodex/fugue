@@ -1,10 +1,10 @@
 # Fugue CRDT Text Editor
 
-A minimal implementation of the [Fugue CRDT](https://arxiv.org/abs/2305.00583) CRDT for collaborative text editing, built with TypeScript and Vite.
+A minimal implementation of the [Fugue CRDT](https://arxiv.org/abs/2305.00583) (and FugueMax in extension) CRDT for collaborative text editing, built with TypeScript and Vite.
 
 ## What it does
 
-Two independent replicas (A and B) each maintain their own document tree. You can type in either editor and merge changes in either direction — the Fugue CRDT guarantees convergence without conflicts.
+Independent replicas, each maintain their own document tree. You can type in either editor and merge changes in either direction — the Fugue CRDT guarantees convergence without conflicts.
 
 ## How it works
 
@@ -21,4 +21,4 @@ npm run dev
 ```
 
 Open the local URL printed by Vite. 
-Type in either text area, then use the merge buttons to sync.
+Type in any text area or create new replicas, then use the merge buttons to sync.
