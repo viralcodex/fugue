@@ -5,6 +5,7 @@ export type Id = [ RId, number]; //node id
 export type Node = {
     readonly id: Id | null;
     readonly parent: Id | null,
+    readonly rightOrigin: Id | null,
     side: 'L' | 'R' | null,
     content: string | null,
     isDeleted: boolean;
@@ -12,7 +13,7 @@ export type Node = {
 
 export type Doc = {
     node: Node,
-    leftChildren: string[]; //id key string only
+    leftChildren: string[];
     rightChildren: string[];
 }
 
@@ -21,6 +22,7 @@ export type ReplicaState = {
     counter: number,
     docTree: Map<string, Doc>, //per replica doc tree state
     visibleContentCache: Node[] | null,
+    fullCache: Node[] | null
 }
 
 export type Insert = {

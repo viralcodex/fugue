@@ -35,7 +35,7 @@
 
 		.areas {
 			display: grid;
-			grid-template-columns: 1fr 1fr;
+			grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
 			gap: 14px;
 			margin-bottom: 16px;
 		}
@@ -93,6 +93,17 @@
 			gap: 10px;
 			flex-wrap: wrap;
 			justify-content: center;
+			align-items: center;
+		}
+
+		select {
+			border: 1px solid #4a4a4a;
+			background: #2b2222;
+			color: #f3f4f6;
+			border-radius: 10px;
+			padding: 10px 12px;
+			font-size: 14px;
+			cursor: pointer;
 		}
 
 		button {
@@ -114,6 +125,26 @@
 
 		button:active {
 			transform: translateY(1px);
+		}
+
+		#add {
+			border-style: dashed;
+			border-color: #555;
+			background: transparent;
+			color: #888;
+			font-size: 24px;
+			min-height: 220px;
+			border-radius: 10px;
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			transition: border-color 150ms ease, color 150ms ease;
+		}
+
+		#add:hover {
+			border-color: #69a0ff;
+			color: #69a0ff;
 		}
 
 		#node {
@@ -146,20 +177,16 @@
 </head>
 <body>
 	<main class="container">
-		<section class="areas">
-			<div class="editor-wrap">
-				<textarea id="leftText" placeholder="USER 1"></textarea>
-				<div class="highlight-layer" id="hlLeft"></div>
-			</div>
-			<div class="editor-wrap">
-				<textarea id="rightText" placeholder="USER 2"></textarea>
-				<div class="highlight-layer" id="hlRight"></div>
-			</div>
+		<section class="areas" id="areas">
+			<!-- default replicas A & B are created by editor.ts -->
+			<button id="add" type="button">+ Add Replica</button>
 		</section>
 
-		<section class="buttons">
-			<button id="copyLeftToRight" type="button">Merge Left to Right</button>
-			<button id="copyRightToLeft" type="button">Merge Right to Left</button>
+		<section class="buttons" id="mergeButtons">
+			<select id="srcReplica"></select>
+			<button id="mergePair" type="button">Merge</button>
+			<select id="targetReplica"></select>
+			<button id="syncAll" type="button">Sync All</button>
 			<button id="resetAll" type="button">Reset Everything</button>
 		</section>
 		<section>

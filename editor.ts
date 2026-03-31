@@ -1,56 +1,37 @@
-import { deletes, readText, resetAllDocuments, inserts, mergeDocs, getNodeAtIndex } from "./crdt";
+import { deletes, readText, resetAllDocuments, inserts, mergeDocs, syncAllReplicas, getNodeAtIndex, addReplica, getReplicaIds } from "./crdt";
 import type { Replica } from "./types";
 
-const leftTextArea = document.getElementById("leftText") as HTMLTextAreaElement | null;
-const rightTextArea = document.getElementById("rightText") as HTMLTextAreaElement | null;
-const mergeLeftToRight = document.getElementById("copyLeftToRight") as HTMLButtonElement | null;
-const mergeRightToLeft = document.getElementById("copyRightToLeft") as HTMLButtonElement | null;
+const areas = document.getElementById("areas") as HTMLSelectElement | null;
+const addButton = document.getElementById("add") as HTMLButtonElement | null;
+const syncAllBtn = document.getElementById("syncAll") as HTMLButtonElement | null;
 const resetAll = document.getElementById("resetAll") as HTMLButtonElement | null;
-
 const node = document.getElementById("node") as HTMLDivElement | null;
 
-if (!leftTextArea || !rightTextArea || !mergeLeftToRight || !mergeRightToLeft || !resetAll || !node) {
-  throw new Error("Required DOM elements are missing.");
-}
+const srcSelect = document.getElementById("srcReplica") as HTMLSelectElement | null;
+const targetSelect = document.getElementById("targetReplica") as HTMLSelectElement | null;
+const mergePairBtn = document.getElementById("mergePair") as HTMLButtonElement | null;
 
-resetAll.addEventListener("click", () => {
-  resetAllDocuments();
-  for (const replica of Object.values(replicas)) {
-    replica.textArea.value = "";
-    replica.highlight.textContent = "";
+if (!areas || !addButton || !syncAllBtn || !resetAll || !node || !srcSelect || !targetSelect || !mergePairBtn)
+  throw new Error("Elements not present")
+
+const LABELS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+const replicas: Record<string, Replica> = {};
+let replicaCounter = 0;
+
+const nextId = (): string => {
+  if (replicaCounter >= LABELS.length) {
+    throw new Error("Replica limit reached.");
   }
-  node.textContent = "";
-});
 
-const replicas: Record<string, Replica> = {
-  "A": {
-    snapshot: "",
-    textArea: leftTextArea,
-    highlight: document.getElementById("hlLeft") as HTMLDivElement,
-  },
-  "B": {
-    snapshot: "",
-    highlight: document.getElementById("hlRight") as HTMLDivElement,
-    textArea: rightTextArea,
+  while (getReplicaIds().includes(LABELS[replicaCounter]!)) replicaCounter++;
+
+  if (replicaCounter >= LABELS.length) {
+    throw new Error("Replica limit reached.");
   }
-}
 
-mergeLeftToRight.addEventListener("click", () => {
-  mergeDocs();
-  rightTextArea.value = readText("B");
-});
-
-mergeRightToLeft.addEventListener("click", () => {
-  mergeDocs(false);
-  leftTextArea.value = readText("A");
-});
-
-for(const [id, replica] of Object.entries(replicas))
-{
-  replica.textArea.addEventListener("beforeinput", () => { replica.snapshot = replica.textArea.value });
-  replica.textArea.addEventListener("input", () => handleEdit(id, replica));
-}
-
+  return LABELS[replicaCounter++]!;
+};
 
 const handleEdit = (replicaId: string, replica: Replica) => {
   const oldVal = replica.snapshot;
@@ -85,7 +66,7 @@ const handleEdit = (replicaId: string, replica: Replica) => {
 let lastIdx: number | null = null;
 let lastTa: HTMLTextAreaElement | null = null;
 
-const highlight = (ta: HTMLTextAreaElement, hl: HTMLDivElement, idx: number) => {
+const highlightElement = (ta: HTMLTextAreaElement, hl: HTMLDivElement, idx: number) => {
   const s = document.createElement("span");
   s.className = "hl";
   s.textContent = ta.value[idx]!;
@@ -100,14 +81,51 @@ const clearHighlight = (hl: HTMLDivElement) => {
   hl.textContent = "";
 };
 
-for (const [id, replica] of Object.entries(replicas)) {
-  const { textArea, highlight: hl } = replica;
+const refreshReplicaText = (replicaId: string) => {
+  replicas[replicaId]!.textArea.value = readText(replicaId);
+};
+
+const refreshAllReplicaText = () => {
+  for (const id of Object.keys(replicas)) {
+    refreshReplicaText(id);
+  }
+};
+
+const resetReplicaUI = () => {
+  for (const replica of Object.values(replicas)) {
+    replica.snapshot = "";
+    replica.textArea.value = "";
+    replica.highlight.textContent = "";
+  }
+  node.textContent = "";
+};
+
+const createReplicaUI = (id: string) => {
+  const wrap = document.createElement("div");
+
+  wrap.className = "editor-wrap";
+  wrap.dataset.replicaId = id;
+
+  const textArea = document.createElement("textarea");
+  textArea.placeholder = "USER " + id;
+
+  const highlight = document.createElement("div");
+  highlight.className = "highlight-layer";
+
+  wrap.append(textArea, highlight);
+  areas.insertBefore(wrap, addButton);
+
+  const replica: Replica = { snapshot: "", textArea: textArea, highlight: highlight };
+
+  replicas[id] = replica;
+
+  textArea.addEventListener("beforeinput", () => { replica.snapshot = textArea.value; });
+  textArea.addEventListener("input", () => handleEdit(id, replica));
 
   textArea.addEventListener("mousemove", (e) => {
     const idx = document.caretPositionFromPoint(e.clientX, e.clientY)?.offset ?? null;
-
     if (idx === null || idx >= textArea.value.length) {
-      clearHighlight(hl);
+      clearHighlight(highlight);
       return;
     }
 
@@ -116,12 +134,73 @@ for (const [id, replica] of Object.entries(replicas)) {
     lastIdx = idx;
     lastTa = textArea;
 
-    highlight(textArea, hl, idx);
+    highlightElement(textArea, highlight, idx);
+
     const n = getNodeAtIndex(idx, id);
+
     node.textContent = n ? JSON.stringify(n, null, 2) : "";
   });
 
-  textArea.addEventListener("mouseleave", () => clearHighlight(hl));
-  textArea.addEventListener("scroll", () => { hl.scrollTop = textArea.scrollTop; });
-}
+  textArea.addEventListener("mouseleave", () => clearHighlight(highlight));
+  textArea.addEventListener("scroll", () => { highlight.scrollTop = textArea.scrollTop; });
+};
 
+const updateSelects = () => {
+  const ids = getReplicaIds();
+  const defaultSrc = ids[0] ?? "";
+  const defaultTarget = ids[1] ?? defaultSrc;
+
+  for (const sel of [srcSelect, targetSelect]) {
+    const current = sel.value;
+    sel.innerHTML = "";
+
+    for (const id of ids) {
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = id;
+      sel.append(opt);
+    }
+
+    if (ids.includes(current)) {
+      sel.value = current;
+    }
+  }
+
+  //default behaviour
+  if (!srcSelect.value) {
+    srcSelect.value = defaultSrc;
+  }
+  if (!targetSelect.value) {
+    targetSelect.value = defaultTarget;
+  }
+};
+
+addButton.addEventListener("click", () => {
+  const id = nextId();
+  addReplica(id);
+  createReplicaUI(id);
+  updateSelects();
+});
+
+mergePairBtn.addEventListener("click", () => {
+  const src = srcSelect.value;
+  const target = targetSelect.value;
+  if (src === target) return;
+  mergeDocs(true, src, target);
+  refreshReplicaText(target);
+});
+
+syncAllBtn.addEventListener("click", () => {
+  syncAllReplicas();
+  refreshAllReplicaText();
+});
+
+resetAll.addEventListener("click", () => {
+  resetAllDocuments();
+  resetReplicaUI();
+});
+
+createReplicaUI("A");
+createReplicaUI("B");
+
+updateSelects();
