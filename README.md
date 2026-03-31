@@ -1,3 +1,4 @@
+https://github.com/user-attachments/assets/fb075411-aca7-46bd-9afe-ae6ead75e15c
 # Fugue CRDT Text Editor
 
 A minimal implementation of the [Fugue CRDT](https://arxiv.org/abs/2305.00583) (and FugueMax in extension) CRDT for collaborative text editing, built with TypeScript and Vite.
