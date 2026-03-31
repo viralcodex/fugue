@@ -5,7 +5,7 @@ export type Id = [ RId, number]; //node id
 export type Node = {
     readonly id: Id | null;
     readonly parent: Id | null,
-    side: 'L' | 'R' | null, //which subtree
+    side: 'L' | 'R' | null,
     content: string | null,
     isDeleted: boolean;
 }
